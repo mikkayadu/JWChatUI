@@ -1,5 +1,12 @@
 import type { ChatResponse, SourceItem } from '../types'
 
+/**
+ * Base URL for the backend API. Empty in development so requests use relative
+ * paths handled by Vite's dev proxy (see vite.config.ts). In production set
+ * VITE_API_BASE_URL to the deployed backend origin (e.g. on Vercel).
+ */
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+
 export type ThinkingMode = 'normal' | 'thinking' | 'advanced'
 
 export interface StreamCallbacks {
@@ -20,7 +27,7 @@ export async function sendMessageStream(
   callbacks: StreamCallbacks = {},
   signal?: AbortSignal
 ): Promise<void> {
-  const response = await fetch('/api/chat/stream', {
+  const response = await fetch(`${API_BASE}/api/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question, top_k: topK, mode }),
@@ -90,7 +97,7 @@ export async function sendMessage(
   mode: ThinkingMode = 'normal',
   signal?: AbortSignal
 ): Promise<ChatResponse> {
-  const response = await fetch('/api/chat', {
+  const response = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question, top_k: topK, mode }),
@@ -133,7 +140,7 @@ export async function fetchScripture(
   })
   if (params.endVerse) query.set('end_verse', String(params.endVerse))
 
-  const response = await fetch(`/api/scripture?${query.toString()}`, { signal })
+  const response = await fetch(`${API_BASE}/api/scripture?${query.toString()}`, { signal })
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
     throw new Error(error.detail || `Request failed with status ${response.status}`)
@@ -143,7 +150,7 @@ export async function fetchScripture(
 
 export async function checkHealth(): Promise<boolean> {
   try {
-    const response = await fetch('/health')
+    const response = await fetch(`${API_BASE}/health`)
     return response.ok
   } catch {
     return false
