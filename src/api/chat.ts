@@ -148,6 +148,24 @@ export async function fetchScripture(
   return response.json()
 }
 
+const ogImageCache = new Map<string, string | null>()
+
+export async function fetchOgImage(url: string): Promise<string | null> {
+  if (ogImageCache.has(url)) return ogImageCache.get(url) ?? null
+
+  try {
+    const response = await fetch(`/api/og-image?url=${encodeURIComponent(url)}`)
+    if (!response.ok) return null
+    const data = await response.json()
+    const image = data.image ?? null
+    ogImageCache.set(url, image)
+    return image
+  } catch {
+    ogImageCache.set(url, null)
+    return null
+  }
+}
+
 export async function checkHealth(): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/health`)

@@ -4,6 +4,7 @@ import type { ChatMessage } from '../../types'
 import type { ThinkingMode } from '../../api/chat'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
+import { JWWatermark } from '../JWLogo'
 
 interface ChatAreaProps {
   messages: ChatMessage[]
@@ -32,21 +33,20 @@ export default function ChatArea({ messages, isLoading, onSend, mode, onModeChan
     }
   }, [messages, isLoading])
 
-  // Once tokens start arriving the answer renders in its own growing bubble, so
-  // hide the separate "thinking" indicator to avoid showing both at once.
   const lastMessage = messages[messages.length - 1]
   const isStreaming = lastMessage?.role === 'assistant' && lastMessage.streaming === true
+  const hasOnlyWelcome = messages.length <= 1
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-full">
-      <header className="hidden lg:flex items-center justify-between px-6 py-4 border-b border-border bg-white shrink-0">
-        <h2 className="text-lg font-bold text-text-primary">JWChat</h2>
+      <header className="hidden lg:flex items-center justify-between px-6 py-3.5 border-b border-border bg-white/80 backdrop-blur-sm shrink-0">
+        <h2 className="text-[15px] font-bold text-text-primary tracking-tight">JWChat</h2>
         <button
           type="button"
           aria-label="Settings"
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+          className="p-2 rounded-xl hover:bg-black/[0.04] transition-colors cursor-pointer"
         >
-          <Settings className="w-5 h-5 text-text-secondary" />
+          <Settings className="w-[18px] h-[18px] text-text-secondary" strokeWidth={1.8} />
         </button>
       </header>
 
@@ -55,29 +55,37 @@ export default function ChatArea({ messages, isLoading, onSend, mode, onModeChan
         onScroll={checkIfNearBottom}
         role="log"
         aria-label="Chat messages"
-        className="flex-1 overflow-y-auto bg-chat-bg py-6 space-y-5"
+        className="flex-1 overflow-y-auto bg-chat-bg relative"
       >
-        {messages.map(msg => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
-
-        {isLoading && !isStreaming && (
-          <div className="flex gap-3 px-6" aria-label="Thinking" role="status">
-            <div className="w-8 h-8 rounded-full bg-sidebar flex items-center justify-center shrink-0">
-              <BookOpenCheck className="w-4 h-4 text-blue-300" />
-            </div>
-            <div className="bg-assistant-bg rounded-2xl rounded-bl-md border border-border px-5 py-4 shadow-sm">
-              <div className="flex gap-1.5" aria-hidden="true">
-                <div className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-              <span className="sr-only">Generating response...</span>
-            </div>
+        {hasOnlyWelcome && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <JWWatermark />
           </div>
         )}
 
-        <div ref={messagesEndRef} />
+        <div className="relative z-10 py-6 space-y-5 max-w-3xl mx-auto">
+          {messages.map(msg => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
+
+          {isLoading && !isStreaming && (
+            <div className="flex gap-3 px-6" aria-label="Thinking" role="status">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+                <BookOpenCheck className="w-4 h-4 text-white" strokeWidth={2} />
+              </div>
+              <div className="bg-white rounded-2xl rounded-bl-md border border-border px-5 py-4 shadow-sm">
+                <div className="flex gap-1.5" aria-hidden="true">
+                  <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="sr-only">Generating response...</span>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       <ChatInput onSend={onSend} isLoading={isLoading} mode={mode} onModeChange={onModeChange} />

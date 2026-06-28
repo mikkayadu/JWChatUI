@@ -1,20 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-sidebar: #1e2a3a;
-  --color-sidebar-hover: #2a3a4e;
-  --color-sidebar-active: #354d6b;
-  --color-primary: #3b6eb5;
-  --color-primary-dark: #2c5a9a;
-  --color-accent-blue: #4a7ec7;
-  --color-accent-orange: #d4872e;
-  --color-chat-bg: #f5f5f5;
+  /* JW.org-inspired palette */
+  --color-sidebar: #2b3544;
+  --color-sidebar-hover: #3a4556;
+  --color-sidebar-active: #4a5a70;
+  --color-primary: #4a6da7;
+  --color-primary-dark: #3d5a8a;
+  --color-primary-light: #5a82c4;
+  --color-accent-blue: #4a6da7;
+  --color-accent-orange: #c2802d;
+  --color-accent-gold: #b8963e;
+  --color-chat-bg: #f7f7f8;
   --color-assistant-bg: #ffffff;
-  --color-user-bg: #e8e8e8;
-  --color-border: #e0e0e0;
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #666666;
-  --color-text-muted: #999999;
+  --color-user-bg: #4a6da7;
+  --color-border: #e5e5ea;
+  --color-text-primary: #1d1d1f;
+  --color-text-secondary: #6e6e73;
+  --color-text-muted: #aeaeb2;
 
   --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
@@ -27,11 +30,11 @@ html, body, #root {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #c0c0c0 transparent;
+  scrollbar-color: #c8c8cc transparent;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -39,25 +42,24 @@ html, body, #root {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c0c0c0;
-  border-radius: 3px;
+  background: #c8c8cc;
+  border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a0a0a0;
+  background: #a0a0a4;
 }
 
 @keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in-up {
-  animation: fade-in-up 150ms ease-out;
+  animation: fade-in-up 200ms ease-out;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.04; }
+  50% { opacity: 0.07; }
 }

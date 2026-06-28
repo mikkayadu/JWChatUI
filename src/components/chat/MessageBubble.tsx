@@ -1,5 +1,5 @@
 import { useState, useCallback, type ReactNode } from 'react'
-import { BookOpenCheck, User, ExternalLink } from 'lucide-react'
+import { BookOpenCheck, ExternalLink } from 'lucide-react'
 import Markdown from 'react-markdown'
 import type { ChatMessage, SourceItem } from '../../types'
 import ScripturePopup from './ScripturePopup'
@@ -196,11 +196,8 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
   if (message.role === 'user') {
     return (
       <div className="flex justify-end gap-3 px-6">
-        <div className="max-w-[75%] bg-user-bg rounded-2xl rounded-br-md px-4 py-3">
-          <p className="text-sm text-text-primary leading-relaxed">{message.content}</p>
-        </div>
-        <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center shrink-0 mt-1">
-          <User className="w-4 h-4 text-gray-600" />
+        <div className="max-w-[75%] bg-user-bg rounded-2xl rounded-br-sm px-4 py-3 shadow-sm">
+          <p className="text-sm text-white leading-relaxed">{message.content}</p>
         </div>
       </div>
     )
@@ -219,10 +216,10 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
 
   return (
     <div className="flex gap-3 px-6">
-      <div className="w-8 h-8 rounded-full bg-sidebar flex items-center justify-center shrink-0 mt-1">
-        <BookOpenCheck className="w-4 h-4 text-blue-300" />
+      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
+        <BookOpenCheck className="w-4 h-4 text-white" strokeWidth={2} />
       </div>
-      <div className="max-w-[80%] bg-assistant-bg rounded-2xl rounded-bl-md border border-border px-5 py-4 shadow-sm">
+      <div className="max-w-[80%] bg-white rounded-2xl rounded-bl-sm border border-border/60 px-5 py-4 shadow-sm">
         <div className="prose-jwchat">
           <Markdown
             components={{
