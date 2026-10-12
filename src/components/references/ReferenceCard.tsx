@@ -2,26 +2,38 @@ import { useEffect, useState } from 'react'
 import { FileText, BookOpen, Newspaper, Video, ExternalLink } from 'lucide-react'
 import type { SourceItem } from '../../types'
 import { fetchOgImage } from '../../api/chat'
+import type { UiStrings } from '../../i18n/strings'
+import { useLocale } from '../../i18n/locale'
+import { classifySource } from '../../utils/jwUrl'
 
 interface ReferenceCardProps {
   source: SourceItem
 }
 
-function extractSourceInfo(sourceUrl: string): { type: string; publication: string; icon: typeof FileText } {
-  const url = sourceUrl.replace(/^https?:\/\//, '')
-
-  if (url.includes('jw.org') || url.includes('wol.jw.org')) {
-    if (url.includes('/books/')) return { type: 'BOOK', publication: 'jw.org — Books', icon: BookOpen }
-    if (url.includes('/magazines/')) return { type: 'MAGAZINE', publication: 'jw.org — Magazines', icon: Newspaper }
-    if (url.includes('/videos/')) return { type: 'VIDEO', publication: 'jw.org — Videos', icon: Video }
-    return { type: 'ARTICLE', publication: 'jw.org', icon: FileText }
+function extractSourceInfo(
+  sourceUrl: string,
+  t: UiStrings
+): { type: string; publication: string; icon: typeof FileText } {
+  const { kind, host } = classifySource(sourceUrl)
+  const type = t.sourceTypes[kind]
+  switch (kind) {
+    case 'book':
+      return { type, publication: `jw.org — ${t.sourceSections.books}`, icon: BookOpen }
+    case 'magazine':
+      return { type, publication: `jw.org — ${t.sourceSections.magazines}`, icon: Newspaper }
+    case 'video':
+      return { type, publication: `jw.org — ${t.sourceSections.videos}`, icon: Video }
+    case 'teaching':
+    case 'article':
+      return { type, publication: 'jw.org', icon: FileText }
+    case 'source':
+      return { type, publication: host || type, icon: FileText }
   }
-
-  return { type: 'SOURCE', publication: url.split('/')[0] || 'Source', icon: FileText }
 }
 
 export default function ReferenceCard({ source }: ReferenceCardProps) {
-  const { type, publication, icon: TypeIcon } = extractSourceInfo(source.source)
+  const { strings: t } = useLocale()
+  const { type, publication, icon: TypeIcon } = extractSourceInfo(source.source, t)
   const score = (source.score * 100).toFixed(0)
   const [thumbnail, setThumbnail] = useState<string | null>(null)
   const [imgError, setImgError] = useState(false)

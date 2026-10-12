@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import JWLogo from '../JWLogo'
+import { useLocale } from '../../i18n/locale'
 
 interface SidebarProps {
   onNewStudy: () => void
@@ -16,13 +17,14 @@ interface SidebarProps {
   onClose: () => void
 }
 
-const navItems = [
-  { icon: Clock, label: 'Recent History' },
-  { icon: BookOpen, label: 'Library' },
-  { icon: Bookmark, label: 'Saved Insights' },
-]
-
 export default function Sidebar({ onNewStudy, isOpen, onClose }: SidebarProps) {
+  const { strings: t } = useLocale()
+  const navItems = [
+    { icon: Clock, label: t.nav.history },
+    { icon: BookOpen, label: t.nav.library },
+    { icon: Bookmark, label: t.nav.saved },
+  ]
+
   return (
     <>
       {isOpen && (
@@ -46,13 +48,13 @@ export default function Sidebar({ onNewStudy, isOpen, onClose }: SidebarProps) {
             <JWLogo size={36} className="text-primary-light" />
             <div>
               <h1 className="text-white text-[15px] font-bold leading-tight tracking-tight">JWChat</h1>
-              <p className="text-white/40 text-[11px] leading-tight">Deep Spiritual Research</p>
+              <p className="text-white/40 text-[11px] leading-tight">{t.tagline}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close sidebar"
+            aria-label={t.closeSidebar}
             className="p-1.5 rounded-lg hover:bg-white/10 text-white/50 lg:hidden cursor-pointer transition-colors"
           >
             <X className="w-5 h-5" />
@@ -66,11 +68,11 @@ export default function Sidebar({ onNewStudy, isOpen, onClose }: SidebarProps) {
             className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-primary hover:bg-primary-light text-white text-sm font-semibold transition-all cursor-pointer shadow-sm shadow-primary/20"
           >
             <Plus className="w-4 h-4" strokeWidth={2.5} />
-            New Study
+            {t.newStudy}
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-1 space-y-0.5" aria-label="Main navigation">
+        <nav className="flex-1 px-3 py-1 space-y-0.5" aria-label={t.mainNavigation}>
           {navItems.map(({ icon: Icon, label }) => (
             <button
               type="button"
@@ -89,7 +91,7 @@ export default function Sidebar({ onNewStudy, isOpen, onClose }: SidebarProps) {
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-white/15 text-white/60 hover:text-white/80 hover:border-white/25 hover:bg-white/[0.05] text-[13px] font-medium transition-all cursor-pointer"
           >
             <ExternalLink className="w-4 h-4" strokeWidth={1.8} />
-            View Resources
+            {t.viewResources}
           </button>
         </div>
 
@@ -99,14 +101,14 @@ export default function Sidebar({ onNewStudy, isOpen, onClose }: SidebarProps) {
             className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-white/50 hover:bg-white/[0.08] hover:text-white/80 text-[13px] transition-all cursor-pointer"
           >
             <Settings className="w-[18px] h-[18px]" strokeWidth={1.8} />
-            Settings
+            {t.settings}
           </button>
           <button
             type="button"
             className="w-full flex items-center gap-3 px-4 py-2 rounded-xl text-white/50 hover:bg-white/[0.08] hover:text-white/80 text-[13px] transition-all cursor-pointer"
           >
             <HelpCircle className="w-[18px] h-[18px]" strokeWidth={1.8} />
-            Help
+            {t.help}
           </button>
         </div>
       </aside>

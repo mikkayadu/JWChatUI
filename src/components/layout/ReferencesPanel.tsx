@@ -1,6 +1,7 @@
 import { BookOpen, X } from 'lucide-react'
 import type { SourceItem } from '../../types'
 import ReferenceCard from '../references/ReferenceCard'
+import { useLocale } from '../../i18n/locale'
 
 interface ReferencesPanelProps {
   sources: SourceItem[]
@@ -9,6 +10,7 @@ interface ReferencesPanelProps {
 }
 
 export default function ReferencesPanel({ sources, isOpen, onClose }: ReferencesPanelProps) {
+  const { strings: t } = useLocale()
   return (
     <>
       {isOpen && (
@@ -30,7 +32,7 @@ export default function ReferencesPanel({ sources, isOpen, onClose }: References
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-border">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-primary" strokeWidth={1.8} />
-            <h2 className="text-[13px] font-bold text-text-primary tracking-tight">References</h2>
+            <h2 className="text-[13px] font-bold text-text-primary tracking-tight">{t.references}</h2>
             {sources.length > 0 && (
               <span className="text-[10px] font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
                 {sources.length}
@@ -40,7 +42,7 @@ export default function ReferencesPanel({ sources, isOpen, onClose }: References
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close references"
+            aria-label={t.closeReferences}
             className="p-1.5 rounded-lg hover:bg-black/[0.04] text-text-muted xl:hidden cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
@@ -54,7 +56,7 @@ export default function ReferencesPanel({ sources, isOpen, onClose }: References
                 <BookOpen className="w-6 h-6 text-text-muted" strokeWidth={1.5} />
               </div>
               <p className="text-xs text-text-muted leading-relaxed">
-                Source references will appear here when you ask a question.
+                {t.referencesEmpty}
               </p>
             </div>
           ) : (

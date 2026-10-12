@@ -1,9 +1,14 @@
-// Builds canonical jw.org study-bible URLs from a scripture reference string.
+// Finds scripture references in answers and resolves them to a book number,
+// which is all /api/scripture needs in any language.
 //
-// URL shape:
-//   https://www.jw.org/en/library/bible/study-bible/books/{slug}/{chapter}/#v{BBCCCVVV}
-// where the anchor is 8 digits: book number (2) + chapter (3) + verse (3),
-// each zero-padded. e.g. Joel 3:20 -> book 29, ch 003, v 020 -> #v29003020
+// English names and abbreviations come from the table below. Other languages'
+// book names come from /api/languages, so answers in those languages link too
+// ("Yohane 3:16", "1 Korintofo 13:4").
+//
+// English study-Bible URL shape:
+//   https://www.jw.org/en/library/bible/study-bible/books/{slug}/{chapter}/#v{B}{CCC}{VVV}
+// The book number isn't zero-padded but chapter and verse are:
+// Genesis 1:1 -> #v1001001, Joel 3:20 -> #v29003020.
 
 interface BibleBook {
   /** Canonical book number, 1 (Genesis) .. 66 (Revelation). */
@@ -84,64 +89,143 @@ const BOOKS: BibleBook[] = [
   { number: 66, slug: 'revelation', aliases: ['revelation', 'revelations', 'rev', 're', 'rv', 'apocalypse'] },
 ]
 
-// alias -> book lookup, built once.
-const BOOK_BY_ALIAS = new Map<string, BibleBook>()
-for (const book of BOOKS) {
-  for (const alias of book.aliases) {
-    BOOK_BY_ALIAS.set(alias, book)
-  }
-}
-
-/** Normalize a book token: lowercase, strip periods, collapse whitespace. */
+/** Lowercase, drop periods and accents, fold Twi ɛ/ɔ, turn a leading ordinal
+ * into a number and join it to the name, so "1 Kor." matches "1kor",
+ * "First John" matches "1 John" and "Adiyisem" matches "Adiyisɛm". */
 function normalizeBook(raw: string): string {
   return raw
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
     .toLowerCase()
+    .replace(/ɛ/g, 'e')
+    .replace(/ɔ/g, 'o')
     .replace(/\./g, '')
     .replace(/\s+/g, ' ')
     .trim()
+    .replace(/^(?:first|1st) /, '1 ')
+    .replace(/^(?:second|2nd) /, '2 ')
+    .replace(/^(?:third|3rd) /, '3 ')
+    .replace(/^([1-3]) /, '$1')
 }
 
-export interface ParsedScripture {
-  book: BibleBook
+// A word that numbers the book after it ("1 John", "First John", "II Kings").
+const ORDINAL_WORD = /^(?:[1-3]|1st|2nd|3rd|first|second|third|i{1,3})$/i
+
+// normalized English name or abbreviation -> book number, built once.
+const ENGLISH_INDEX = new Map<string, number>()
+for (const book of BOOKS) {
+  for (const alias of book.aliases) {
+    ENGLISH_INDEX.set(normalizeBook(alias), book.number)
+  }
+}
+
+// Two-letter abbreviations ("Na", "Ne", "So", "Da") are everyday words in
+// other languages, so answers in those languages only match longer ones.
+const ENGLISH_INDEX_NO_SHORT = new Map(
+  [...ENGLISH_INDEX].filter(([alias]) => alias.replace(/[^a-z]/g, '').length > 2)
+)
+
+const indexCache = new WeakMap<readonly string[], Map<string, number>>()
+
+/** Name -> book number for one language's 66 names (index = number - 1),
+ * plus English names and abbreviations, which other-language answers
+ * sometimes use. */
+function bookIndex(bookNames: readonly string[]): Map<string, number> {
+  if (bookNames.length === 0) return ENGLISH_INDEX
+  let index = indexCache.get(bookNames)
+  if (!index) {
+    index = new Map(ENGLISH_INDEX_NO_SHORT)
+    // Names past the 66th would give book numbers no endpoint accepts.
+    for (const [i, name] of bookNames.slice(0, BOOKS.length).entries()) {
+      index.set(normalizeBook(name), i + 1)
+    }
+    indexCache.set(bookNames, index)
+  }
+  return index
+}
+
+export interface ScriptureRef {
+  /** The reference as written in the answer, e.g. "1 Korintofo 13:4". */
+  label: string
+  /** Canonical book number, 1 (Genesis) .. 66 (Revelation). */
+  book: number
   chapter: number
   verse: number
-  /** Last verse of a range (e.g. 6 for "23:1-6"), if one was given. */
+  /** Last verse of a range within the chapter (e.g. 6 for "23:1-6"). A range
+   * into another chapter ("1:1-2:3") isn't fetchable in one request, so it
+   * keeps only its first verse. */
   endVerse: number | null
-  /** The verse the URL anchors to, formatted "Book Chapter:Verse". */
-  canonical: string
-  url: string
+}
+
+// Capital then lowercase, so all-caps tokens like "AM" and "PM" don't match.
+const NAME_WORD = String.raw`\p{Lu}[\p{Ll}\p{M}]*\.?`
+
+/**
+ * Source for a regex (needs the `u` flag) matching a candidate reference: a
+ * run of capitalised words (optionally numbered, "of" allowed between words,
+ * trailing periods for abbreviations) followed by chapter:verse, a verse list
+ * and/or range. The run may start with words that aren't part of the book name
+ * ("In John 3:16"); `resolveScripture` works out which are.
+ */
+export const SCRIPTURE_PATTERN = String.raw`(?<![\p{L}\p{N}])(?:[1-3](?:st|nd|rd)?\s?)?${NAME_WORD}(?:\s(?:of\s)?${NAME_WORD})*\s+\d+:\d+(?:[,\s]+\d+)*(?:[-–]\d+(?::\d+)?)?`
+
+/**
+ * Resolve a candidate matched by SCRIPTURE_PATTERN against `bookNames` (the
+ * answer language's, may be empty) and the English names. Returns the text
+ * before the book name and the parsed reference, or null when no book is
+ * recognised. Tries the longest run of words first, so "1 Korintofo" wins over
+ * "Korintofo", and never drops a numbering word: an unknown "First Xyz" is
+ * not a match for "Xyz".
+ */
+export function resolveScripture(
+  candidate: string,
+  bookNames: readonly string[]
+): { prefix: string; ref: ScriptureRef } | null {
+  const m = candidate.match(/^(.+?)\s+(\d+)\s*:\s*(\d+)(?:\s*[-–]\s*(\d+)(\s*:)?)?/u)
+  if (!m) return null
+
+  const index = bookIndex(bookNames)
+  let previousWord = ''
+  for (const word of m[1].matchAll(/\S+/g)) {
+    if (ORDINAL_WORD.test(previousWord)) return null
+    previousWord = word[0]
+
+    const book = index.get(normalizeBook(m[1].slice(word.index)))
+    if (!book) continue
+
+    const chapter = parseInt(m[2], 10)
+    const verse = parseInt(m[3], 10)
+    if (!chapter || !verse) return null
+
+    // m[5] is set when the range ends in another chapter ("1:1-2:3").
+    const endParsed = m[4] && !m[5] ? parseInt(m[4], 10) : NaN
+    return {
+      prefix: candidate.slice(0, word.index),
+      ref: {
+        label: candidate.slice(word.index),
+        book,
+        chapter,
+        verse,
+        endVerse: endParsed > verse ? endParsed : null,
+      },
+    }
+  }
+  return null
 }
 
 const pad = (n: number, len: number) => String(n).padStart(len, '0')
 
-/**
- * Parse a reference like "Joel 3:20", "1 Chronicles 4:2", "2 Tim 3:12",
- * "Ps 23:1-6" and return the jw.org study-bible URL for the first verse.
- * Returns null if the book can't be recognized.
- */
-export function parseScriptureReference(reference: string): ParsedScripture | null {
-  // Capture: book (lazy, may start with a leading number), chapter, verse,
-  // and an optional end verse for ranges ("-6" / "–6").
-  const m = reference.match(/^\s*([1-3]?\s*[A-Za-z][A-Za-z. ]*?)\s+(\d+)\s*:\s*(\d+)(?:\s*[-–]\s*(\d+))?/)
-  if (!m) return null
-
-  const book = BOOK_BY_ALIAS.get(normalizeBook(m[1]))
-  if (!book) return null
-
-  const chapter = parseInt(m[2], 10)
-  const verse = parseInt(m[3], 10)
-  if (!chapter || !verse) return null
-
-  const endParsed = m[4] ? parseInt(m[4], 10) : NaN
-  const endVerse = Number.isFinite(endParsed) && endParsed > verse ? endParsed : null
-
-  const anchor = `${pad(book.number, 2)}${pad(chapter, 3)}${pad(verse, 3)}`
-  const url = `https://www.jw.org/en/library/bible/study-bible/books/${book.slug}/${chapter}/#v${anchor}`
-
-  return { book, chapter, verse, endVerse, canonical: `${book.slug} ${chapter}:${verse}`, url }
+/** jw.org's id for the reference's first verse, e.g. "v43003016". */
+export function verseAnchor(ref: ScriptureRef): string {
+  return `v${ref.book}${pad(ref.chapter, 3)}${pad(ref.verse, 3)}`
 }
 
-/** Convenience: just the URL, or null if unparseable. */
-export function scriptureUrl(reference: string): string | null {
-  return parseScriptureReference(reference)?.url ?? null
+/** The English jw.org slug for a book number, e.g. "1-chronicles". */
+export function bookSlug(book: number): string {
+  return BOOKS[book - 1].slug
+}
+
+/** English study-Bible URL for the reference's first verse. */
+export function studyBibleUrl(ref: ScriptureRef): string {
+  return `https://www.jw.org/en/library/bible/study-bible/books/${bookSlug(ref.book)}/${ref.chapter}/#${verseAnchor(ref)}`
 }

@@ -1,3 +1,5 @@
+import { useLocale } from '../i18n/locale'
+
 interface JWLogoProps {
   className?: string
   size?: number
@@ -46,11 +48,12 @@ export default function JWLogo({ className = '', size = 40 }: JWLogoProps) {
 }
 
 export function JWWatermark({ className = '' }: { className?: string }) {
+  const { strings: t } = useLocale()
   return (
     <div className={`flex flex-col items-center gap-3 select-none pointer-events-none ${className}`}>
       <JWLogo size={72} className="text-primary/[0.06]" />
       <p className="text-sm font-medium text-text-primary/[0.08] tracking-wide">
-        Deep Spiritual Research
+        {t.tagline}
       </p>
     </div>
   )

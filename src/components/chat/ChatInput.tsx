@@ -1,11 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { ArrowUp, BookMarked, ChevronDown, Zap, Brain, Sparkles } from 'lucide-react'
 import type { ThinkingMode } from '../../api/chat'
+import { useLocale } from '../../i18n/locale'
+import LanguagePicker from './LanguagePicker'
 
-const MODES: { value: ThinkingMode; label: string; description: string; icon: typeof Zap }[] = [
-  { value: 'normal', label: 'Normal', description: 'Fast response', icon: Zap },
-  { value: 'thinking', label: 'Thinking', description: 'Deeper analysis', icon: Brain },
-  { value: 'advanced', label: 'Advanced', description: 'Multi-strategy', icon: Sparkles },
+const MODES: { value: ThinkingMode; icon: typeof Zap }[] = [
+  { value: 'normal', icon: Zap },
+  { value: 'thinking', icon: Brain },
+  { value: 'advanced', icon: Sparkles },
 ]
 
 interface ChatInputProps {
@@ -13,9 +15,19 @@ interface ChatInputProps {
   isLoading: boolean
   mode: ThinkingMode
   onModeChange: (mode: ThinkingMode) => void
+  language: string
+  onLanguageChange: (code: string) => void
 }
 
-export default function ChatInput({ onSend, isLoading, mode, onModeChange }: ChatInputProps) {
+export default function ChatInput({
+  onSend,
+  isLoading,
+  mode,
+  onModeChange,
+  language,
+  onLanguageChange,
+}: ChatInputProps) {
+  const { strings: t, languages } = useLocale()
   const [message, setMessage] = useState('')
   const [includeCitations, setIncludeCitations] = useState(true)
   const [modeDropdownOpen, setModeDropdownOpen] = useState(false)
@@ -78,10 +90,10 @@ export default function ChatInput({ onSend, isLoading, mode, onModeChange }: Cha
               value={message}
               onChange={handleInput}
               onKeyDown={handleKeyDown}
-              placeholder="Ask a question about Bible teachings..."
+              placeholder={t.inputPlaceholder}
               disabled={isLoading}
               rows={1}
-              aria-label="Message input"
+              aria-label={t.inputLabel}
               className="w-full resize-none bg-transparent px-4 pt-3.5 pb-12 text-sm text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
             />
 
@@ -98,7 +110,7 @@ export default function ChatInput({ onSend, isLoading, mode, onModeChange }: Cha
                   }`}
                 >
                   <BookMarked className="w-3.5 h-3.5" strokeWidth={1.8} />
-                  Citations
+                  {t.citations}
                 </button>
 
                 <div className="relative" ref={dropdownRef}>
@@ -112,7 +124,7 @@ export default function ChatInput({ onSend, isLoading, mode, onModeChange }: Cha
                     }`}
                   >
                     <CurrentIcon className="w-3.5 h-3.5" strokeWidth={1.8} />
-                    {currentMode.label}
+                    {t.modes[currentMode.value].label}
                     <ChevronDown className="w-3 h-3" />
                   </button>
 
@@ -137,8 +149,8 @@ export default function ChatInput({ onSend, isLoading, mode, onModeChange }: Cha
                           >
                             <Icon className="w-4 h-4 shrink-0" strokeWidth={1.8} />
                             <div>
-                              <div className="font-semibold text-[13px]">{m.label}</div>
-                              <div className="text-text-muted text-[11px] mt-0.5">{m.description}</div>
+                              <div className="font-semibold text-[13px]">{t.modes[m.value].label}</div>
+                              <div className="text-text-muted text-[11px] mt-0.5">{t.modes[m.value].description}</div>
                             </div>
                           </button>
                         )
@@ -146,12 +158,16 @@ export default function ChatInput({ onSend, isLoading, mode, onModeChange }: Cha
                     </div>
                   )}
                 </div>
+
+                {languages.length > 1 && (
+                  <LanguagePicker value={language} onChange={onLanguageChange} />
+                )}
               </div>
 
               <button
                 type="submit"
                 disabled={!hasContent || isLoading}
-                aria-label="Send message"
+                aria-label={t.send}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer shrink-0 ${
                   hasContent && !isLoading
                     ? 'bg-primary hover:bg-primary-dark text-white shadow-sm'

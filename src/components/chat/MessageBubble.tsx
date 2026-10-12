@@ -1,7 +1,11 @@
-import { useState, useCallback, type ReactNode } from 'react'
+import { memo, useState, useCallback, useMemo, type ReactNode } from 'react'
 import { BookOpenCheck, ExternalLink } from 'lucide-react'
 import Markdown from 'react-markdown'
 import type { ChatMessage, SourceItem } from '../../types'
+import type { UiStrings } from '../../i18n/strings'
+import { bookNamesFor, useLocale } from '../../i18n/locale'
+import { SCRIPTURE_PATTERN, resolveScripture, type ScriptureRef } from '../../utils/scripture'
+import { classifySource } from '../../utils/jwUrl'
 import ScripturePopup from './ScripturePopup'
 
 interface MessageBubbleProps {
@@ -22,56 +26,20 @@ interface ParsedContent {
   sourceMap: Map<number, string>
 }
 
-function classifyUrl(url: string): { type: string; title: string } {
-  try {
-    const parsed = new URL(url)
-    const path = parsed.pathname
-    const segments = path.split('/').filter(Boolean)
-
-    const parts =
-      segments.length > 1 && segments[0].length === 2
-        ? segments.slice(1)
-        : segments
-
-    const formatSegment = (s: string) =>
-      s.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-
-    if (parsed.hostname.includes('jw.org') || parsed.hostname.includes('wol.jw.org')) {
-      if (parts.includes('books')) {
-        const bookIdx = parts.indexOf('books')
-        const bookName = parts[bookIdx + 1] ? formatSegment(parts[bookIdx + 1]) : ''
-        const extra = parts.slice(bookIdx + 2).map(formatSegment).join(' — ')
-        return { type: 'Book', title: extra ? `${bookName} — ${extra}` : bookName || 'Book' }
-      }
-      if (parts.includes('magazines')) {
-        const magIdx = parts.indexOf('magazines')
-        const magName = parts[magIdx + 1] ? formatSegment(parts[magIdx + 1]) : ''
-        const article = parts.slice(magIdx + 2).map(formatSegment).join(' — ')
-        return { type: 'Magazine', title: article ? `${magName} — ${article}` : magName || 'Magazine' }
-      }
-      if (parts.includes('videos')) {
-        const vidIdx = parts.indexOf('videos')
-        const vidName = parts.slice(vidIdx + 1).map(formatSegment).join(' — ')
-        return { type: 'Video', title: vidName || 'Video' }
-      }
-      if (parts.includes('bible-teachings') || parts.includes('questions')) {
-        const meaningful = parts.filter(p => !['bible-teachings', 'questions', 'library'].includes(p))
-        return { type: 'Article', title: meaningful.map(formatSegment).join(' — ') || 'Bible Teaching' }
-      }
-      const meaningful = parts.filter(p => !['library'].includes(p))
-      return { type: 'Article', title: meaningful.slice(-2).map(formatSegment).join(' — ') || 'jw.org' }
-    }
-
-    return { type: 'Source', title: parts.slice(-2).map(formatSegment).join(' — ') || parsed.hostname }
-  } catch {
-    return { type: 'Source', title: url.length > 60 ? url.slice(0, 60) + '...' : url }
-  }
+/** Display type and title for a source, in the UI language. */
+function describeSource(url: string, t: UiStrings): { type: string; title: string } {
+  const { kind, title } = classifySource(url)
+  const type = t.sourceTypes[kind]
+  return { type, title: title || (kind === 'teaching' ? t.bibleTeaching : type) }
 }
 
-function parseResponseContent(text: string, backendSources: SourceItem[]): ParsedContent {
-  const sourceSplitRegex = /\n*Sources?:\s*/i
-  const parts = text.split(sourceSplitRegex)
-  const body = parts[0].trim()
+// A "Sources:" section starting a line. Older backends' Advanced mode ends
+// answers with one, duplicating the list shown below the answer.
+const SOURCES_SECTION = /(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*|__)?Sources?(?:\*\*|__)?:/i
+
+function parseResponseContent(text: string, backendSources: SourceItem[], t: UiStrings): ParsedContent {
+  const sectionStart = text.search(SOURCES_SECTION)
+  const body = (sectionStart === -1 ? text : text.slice(0, sectionStart)).trim()
 
   const sourceMap = new Map<number, string>()
   const deduped: ParsedSource[] = []
@@ -86,7 +54,7 @@ function parseResponseContent(text: string, backendSources: SourceItem[]): Parse
     if (existing) {
       existing.indices.push(index)
     } else {
-      const { type, title } = classifyUrl(url)
+      const { type, title } = describeSource(url, t)
       const src: ParsedSource = { index, indices: [index], url, title, type }
       urlToSource.set(url, src)
       deduped.push(src)
@@ -96,19 +64,25 @@ function parseResponseContent(text: string, backendSources: SourceItem[]): Parse
   return { body, sources: deduped, sourceMap }
 }
 
-const SCRIPTURE_REGEX = /\b(\d?\s?[A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\s+(\d+:\d+(?:[,\s]+\d+)*(?:[-–]\d+(?::\d+)?)?)/g
-const CITATION_REGEX = /\[(\d+)\]/g
+const CITATION_PATTERN = String.raw`\[(\d+)\]`
+const INLINE_REGEX = new RegExp(`(${SCRIPTURE_PATTERN})|(${CITATION_PATTERN})`, 'gu')
 
-function processInlineText(
-  text: string,
-  sourceMap: Map<number, string>,
-  onScriptureClick: (ref: string, e: React.MouseEvent<HTMLButtonElement>) => void
-): ReactNode[] {
-  const combined = new RegExp(`(${SCRIPTURE_REGEX.source})|(${CITATION_REGEX.source})`, 'g')
+type ScriptureClickHandler = (ref: ScriptureRef, e: React.MouseEvent<HTMLButtonElement>) => void
+
+interface InlineContext {
+  sourceMap: Map<number, string>
+  /** Book names in the answer's language, for linking scripture references. */
+  bookNames: readonly string[]
+  t: UiStrings
+  onScriptureClick: ScriptureClickHandler
+}
+
+function processInlineText(text: string, ctx: InlineContext): ReactNode[] {
+  const { sourceMap, bookNames, t, onScriptureClick } = ctx
   const result: ReactNode[] = []
   let lastIndex = 0
 
-  for (const match of text.matchAll(combined)) {
+  for (const match of text.matchAll(INLINE_REGEX)) {
     const start = match.index
     if (start > lastIndex) {
       result.push(text.slice(lastIndex, start))
@@ -124,7 +98,7 @@ function processInlineText(
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            title={`Source ${num}`}
+            title={t.sourceNumber(num)}
             className="inline-flex items-center justify-center text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded px-1 py-px mx-px cursor-pointer no-underline transition-colors align-super leading-none"
           >
             {num}
@@ -138,16 +112,22 @@ function processInlineText(
         )
       }
     } else {
-      result.push(
-        <button
-          type="button"
-          key={`s-${start}`}
-          onClick={e => onScriptureClick(match[0], e)}
-          className="text-primary font-semibold hover:underline cursor-pointer bg-transparent border-none p-0 text-sm inline font-[inherit]"
-        >
-          {match[0]}
-        </button>
-      )
+      const resolved = resolveScripture(match[0], bookNames)
+      if (!resolved) {
+        result.push(match[0])
+      } else {
+        if (resolved.prefix) result.push(resolved.prefix)
+        result.push(
+          <button
+            type="button"
+            key={`s-${start}`}
+            onClick={e => onScriptureClick(resolved.ref, e)}
+            className="text-primary font-semibold hover:underline cursor-pointer bg-transparent border-none p-0 text-sm inline font-[inherit]"
+          >
+            {resolved.ref.label}
+          </button>
+        )
+      }
     }
 
     lastIndex = start + match[0].length
@@ -160,18 +140,14 @@ function processInlineText(
   return result
 }
 
-function processChildren(
-  children: ReactNode,
-  sourceMap: Map<number, string>,
-  onScriptureClick: (ref: string, e: React.MouseEvent<HTMLButtonElement>) => void
-): ReactNode {
+function processChildren(children: ReactNode, ctx: InlineContext): ReactNode {
   if (typeof children === 'string') {
-    return processInlineText(children, sourceMap, onScriptureClick)
+    return processInlineText(children, ctx)
   }
   if (Array.isArray(children)) {
     return children.map((child, i) => {
       if (typeof child === 'string') {
-        return <span key={i}>{processInlineText(child, sourceMap, onScriptureClick)}</span>
+        return <span key={i}>{processInlineText(child, ctx)}</span>
       }
       return child
     })
@@ -179,18 +155,21 @@ function processChildren(
   return children
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
+function MessageBubble({ message }: MessageBubbleProps) {
+  const { strings: t, languages } = useLocale()
   const [scripturePopup, setScripturePopup] = useState<{
-    reference: string
+    scripture: ScriptureRef
     rect: DOMRect
   } | null>(null)
 
-  const handleScriptureClick = useCallback(
-    (reference: string, e: React.MouseEvent<HTMLButtonElement>) => {
-      const rect = e.currentTarget.getBoundingClientRect()
-      setScripturePopup({ reference, rect })
-    },
-    []
+  const handleScriptureClick = useCallback<ScriptureClickHandler>((scripture, e) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setScripturePopup({ scripture, rect })
+  }, [])
+
+  const { body, sources, sourceMap } = useMemo(
+    () => parseResponseContent(message.content, message.sources, t),
+    [message.content, message.sources, t]
   )
 
   if (message.role === 'user') {
@@ -203,7 +182,8 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
     )
   }
 
-  const { body, sources, sourceMap } = parseResponseContent(message.content, message.sources)
+  // Answers from backends without languages carry no language: English.
+  const answerLanguage = message.language ?? 'en'
   const caret = message.streaming ? (
     <span
       aria-hidden="true"
@@ -211,8 +191,13 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
     />
   ) : null
 
-  const process = (children: ReactNode) =>
-    processChildren(children, sourceMap, handleScriptureClick)
+  const inlineContext: InlineContext = {
+    sourceMap,
+    bookNames: bookNamesFor(languages, answerLanguage),
+    t,
+    onScriptureClick: handleScriptureClick,
+  }
+  const process = (children: ReactNode) => processChildren(children, inlineContext)
 
   return (
     <div className="flex gap-3 px-6">
@@ -220,7 +205,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
         <BookOpenCheck className="w-4 h-4 text-white" strokeWidth={2} />
       </div>
       <div className="max-w-[80%] bg-white rounded-2xl rounded-bl-sm border border-border/60 px-5 py-4 shadow-sm">
-        <div className="prose-jwchat">
+        <div className="prose-jwchat" lang={answerLanguage}>
           <Markdown
             components={{
               p: ({ children: c }) => (
@@ -283,7 +268,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
         {sources.length > 0 && !message.streaming && (
           <div className="mt-4 pt-3 border-t border-border/60">
             <h5 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2.5">
-              Sources
+              {t.sources}
             </h5>
             <ol className="space-y-2 list-none m-0 p-0">
               {sources.map(src => (
@@ -318,7 +303,9 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
 
       {scripturePopup && (
         <ScripturePopup
-          reference={scripturePopup.reference}
+          key={scripturePopup.scripture.label}
+          scripture={scripturePopup.scripture}
+          lang={answerLanguage}
           anchorRect={scripturePopup.rect}
           onClose={() => setScripturePopup(null)}
         />
@@ -326,3 +313,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
     </div>
   )
 }
+
+// Memoised: while one answer streams, every token re-renders the chat, and the
+// settled bubbles (same message objects) can skip re-parsing their content.
+export default memo(MessageBubble)

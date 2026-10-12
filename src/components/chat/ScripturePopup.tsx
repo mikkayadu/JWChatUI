@@ -1,16 +1,25 @@
 import { createPortal } from 'react-dom'
 import { X, ExternalLink, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { parseScriptureReference } from '../../utils/scripture'
-import { fetchScripture, type ScriptureVerse } from '../../api/chat'
+import { bookSlug, studyBibleUrl, verseAnchor, type ScriptureRef } from '../../utils/scripture'
+import { fetchScripture, type ScriptureResult } from '../../api/chat'
+import { useLocale } from '../../i18n/locale'
 
 interface ScripturePopupProps {
-  reference: string
+  scripture: ScriptureRef
+  /** Language of the Bible to quote and link: the answer's language. */
+  lang: string
   onClose: () => void
   anchorRect: DOMRect | null
 }
 
-export default function ScripturePopup({ reference, onClose, anchorRect }: ScripturePopupProps) {
+type VerseState =
+  | { status: 'loading' }
+  | { status: 'loaded'; result: ScriptureResult }
+  | { status: 'error' }
+
+export default function ScripturePopup({ scripture, lang, onClose, anchorRect }: ScripturePopupProps) {
+  const { strings: t } = useLocale()
   const popupRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -34,37 +43,35 @@ export default function ScripturePopup({ reference, onClose, anchorRect }: Scrip
     popupRef.current?.focus()
   }, [])
 
-  const parsed = parseScriptureReference(reference)
-
-  const [verses, setVerses] = useState<ScriptureVerse[] | null>(null)
-  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading')
+  // The popup is mounted per reference, so the state starts out loading.
+  const [verseState, setVerseState] = useState<VerseState>({ status: 'loading' })
 
   useEffect(() => {
-    if (!parsed) return
     const controller = new AbortController()
-    setStatus('loading')
-    setVerses(null)
     fetchScripture(
       {
-        slug: parsed.book.slug,
-        book: parsed.book.number,
-        chapter: parsed.chapter,
-        verse: parsed.verse,
-        endVerse: parsed.endVerse,
+        book: scripture.book,
+        chapter: scripture.chapter,
+        verse: scripture.verse,
+        endVerse: scripture.endVerse,
+        lang,
+        slug: bookSlug(scripture.book),
       },
       controller.signal
     )
-      .then(result => {
-        setVerses(result.verses)
-        setStatus('loaded')
-      })
+      .then(result => setVerseState({ status: 'loaded', result }))
       .catch((e: unknown) => {
-        if ((e as Error).name !== 'AbortError') setStatus('error')
+        if ((e as Error).name !== 'AbortError') setVerseState({ status: 'error' })
       })
     return () => controller.abort()
-    // parsed is derived from `reference`; re-run only when the reference changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reference])
+  }, [scripture, lang])
+
+  // The backend returns the chapter page in `lang`. Until then, or if the
+  // lookup fails, link the English study Bible, the only URL built locally.
+  const jwOrgUrl =
+    verseState.status === 'loaded'
+      ? `${verseState.result.url}#${verseAnchor(scripture)}`
+      : studyBibleUrl(scripture)
 
   const style: React.CSSProperties = anchorRect
     ? {
@@ -86,40 +93,36 @@ export default function ScripturePopup({ reference, onClose, anchorRect }: Scrip
         ref={popupRef}
         role="dialog"
         aria-modal="true"
-        aria-label={`Scripture: ${reference}`}
+        aria-label={t.scripture(scripture.label)}
+        lang={lang}
         tabIndex={-1}
         style={style}
         className="z-50 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in-up"
       >
         <div className="flex items-center justify-between px-4 py-3 bg-primary/5 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-primary">{reference}</h3>
+          <h3 className="text-sm font-semibold text-primary">{scripture.label}</h3>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close scripture popup"
+            aria-label={t.closeScripture}
             className="p-1 rounded-md hover:bg-gray-200 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
         <div className="px-4 py-3">
-          {!parsed ? (
-            <p className="text-sm text-text-secondary italic leading-relaxed">
-              Couldn't build a Bible link for{' '}
-              <span className="font-medium text-primary">{reference}</span>.
-            </p>
-          ) : status === 'loading' ? (
+          {verseState.status === 'loading' ? (
             <div className="flex items-center gap-2 text-sm text-text-secondary py-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Loading verse…
+              {t.loadingVerse}
             </div>
-          ) : status === 'error' ? (
+          ) : verseState.status === 'error' ? (
             <p className="text-sm text-text-secondary leading-relaxed">
-              Couldn't load the verse text right now.
+              {t.verseError}
             </p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {verses?.map(v => (
+              {verseState.result.verses.map(v => (
                 <p key={v.verse} className="text-sm text-text-primary leading-relaxed">
                   <sup className="text-[10px] font-bold text-primary mr-1">{v.verse}</sup>
                   {v.text}
@@ -128,17 +131,15 @@ export default function ScripturePopup({ reference, onClose, anchorRect }: Scrip
             </div>
           )}
 
-          {parsed && (
-            <a
-              href={parsed.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-primary no-underline hover:underline"
-            >
-              Open on JW.org
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-          )}
+          <a
+            href={jwOrgUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-primary no-underline hover:underline"
+          >
+            {t.openOnJwOrg}
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       </div>
     </div>,
