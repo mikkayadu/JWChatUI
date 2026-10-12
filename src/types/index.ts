@@ -51,4 +51,6 @@ export interface ChatMessage {
   streaming?: boolean
   /** Language the assistant answered in; unset for user messages and older backends. */
   language?: string
+  /** Thumbs up/down the user gave an answer. */
+  feedback?: 'positive' | 'negative'
 }

@@ -5,7 +5,10 @@ export interface UiStrings {
   tagline: string
   welcome: string
   newStudy: string
-  nav: { history: string; library: string; saved: string }
+  nav: { library: string; saved: string }
+  recentChats: string
+  newChatTitle: string
+  deleteChat: string
   viewResources: string
   settings: string
   help: string
@@ -19,9 +22,12 @@ export interface UiStrings {
   chatMessages: string
   thinking: string
   generating: string
+  suggestions: string[]
+  scrollToBottom: string
   inputPlaceholder: string
   inputLabel: string
   send: string
+  stop: string
   citations: string
   modes: Record<ThinkingMode, { label: string; description: string }>
   answerLanguage: string
@@ -39,6 +45,13 @@ export interface UiStrings {
   openOnJwOrg: string
   errorGeneric: string
   noResponse: string
+  copy: string
+  regenerate: string
+  edit: string
+  cancel: string
+  update: string
+  helpful: string
+  notHelpful: string
 }
 
 const en: UiStrings = {
@@ -46,7 +59,10 @@ const en: UiStrings = {
   welcome:
     'Welcome to your study session. I am here to assist you with biblical research. How may I help you explore the Scriptures today?',
   newStudy: 'New Study',
-  nav: { history: 'Recent History', library: 'Library', saved: 'Saved Insights' },
+  nav: { library: 'Library', saved: 'Saved Insights' },
+  recentChats: 'Recent History',
+  newChatTitle: 'New study',
+  deleteChat: 'Delete conversation',
   viewResources: 'View Resources',
   settings: 'Settings',
   help: 'Help',
@@ -60,9 +76,17 @@ const en: UiStrings = {
   chatMessages: 'Chat messages',
   thinking: 'Thinking',
   generating: 'Generating response...',
+  suggestions: [
+    "What does the Bible say about God's Kingdom?",
+    'Why does God allow suffering?',
+    'What happens to us when we die?',
+    'How can I make my prayers more meaningful?',
+  ],
+  scrollToBottom: 'Scroll to latest message',
   inputPlaceholder: 'Ask a question about Bible teachings...',
   inputLabel: 'Message input',
   send: 'Send message',
+  stop: 'Stop generating',
   citations: 'Citations',
   modes: {
     normal: { label: 'Normal', description: 'Fast response' },
@@ -92,6 +116,13 @@ const en: UiStrings = {
   errorGeneric:
     'I apologize, but I encountered an error processing your request. Please try again.',
   noResponse: 'I could not generate a response.',
+  copy: 'Copy',
+  regenerate: 'Regenerate answer',
+  edit: 'Edit question',
+  cancel: 'Cancel',
+  update: 'Update',
+  helpful: 'Helpful',
+  notHelpful: 'Not helpful',
 }
 
 // DRAFT: machine-drafted Twi that must be reviewed by a fluent Twi speaker
@@ -101,7 +132,10 @@ const tw: UiStrings = {
   welcome:
     "Akwaaba wɔ w'adesua mu. Mewɔ ha sɛ mɛboa wo wɔ Bible mu nhwehwɛmu. Ɔkwan bɛn so na metumi aboa wo ma woahwehwɛ Kyerɛwnsɛm no mu nnɛ?",
   newStudy: 'Adesua Foforo',
-  nav: { history: 'Nkɔmmɔ a Atwam', library: 'Nhomakorabea', saved: 'Nsɛm a Woakora' },
+  nav: { library: 'Nhomakorabea', saved: 'Nsɛm a Woakora' },
+  recentChats: 'Nkɔmmɔ a Atwam',
+  newChatTitle: 'Adesua foforo',
+  deleteChat: 'Yi nkɔmmɔ no fi hɔ',
   viewResources: 'Hwɛ Nneɛma a Ɛboa',
   settings: 'Nhyehyɛe',
   help: 'Mmoa',
@@ -115,9 +149,17 @@ const tw: UiStrings = {
   chatMessages: 'Nkɔmmɔ no mu nsɛm',
   thinking: 'Ɛredwene',
   generating: 'Yɛreyɛ mmuae no...',
+  suggestions: [
+    'Dɛn na Bible ka fa Onyankopɔn Ahenni no ho?',
+    'Dɛn nti na Onyankopɔn ma amanehunu kwan?',
+    'Dɛn na ɛto yɛn sɛ yewu a?',
+    'Mɛyɛ dɛn atumi abɔ mpae a ɛfi me koma mu?',
+  ],
+  scrollToBottom: 'Kɔ asɛm a etwa to no so',
   inputPlaceholder: 'Bisa asɛm bi a ɛfa Bible nkyerɛkyerɛ ho...',
   inputLabel: "Kyerɛw w'asɛm",
   send: 'Soma',
+  stop: 'Gyae',
   citations: 'Fibea',
   modes: {
     normal: { label: 'Ntɛm', description: 'Mmuae ntɛmntɛm' },
@@ -147,6 +189,13 @@ const tw: UiStrings = {
   errorGeneric:
     "Yɛpa wo kyɛw, biribi asɛe enti mantumi annyi w'asɛmmisa no ano. Yɛsrɛ wo, san bɔ mmɔden.",
   noResponse: 'Mantumi amma mmuae biara.',
+  copy: 'Fa yɛ bi',
+  regenerate: 'San yɛ mmuae no',
+  edit: 'Sesa asɛmmisa no',
+  cancel: 'Gyae',
+  update: 'Soma bio',
+  helpful: 'Ɛboa',
+  notHelpful: 'Ɛmmoa',
 }
 
 export const UI_STRINGS = { en, tw }

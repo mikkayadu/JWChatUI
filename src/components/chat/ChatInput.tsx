@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { ArrowUp, BookMarked, ChevronDown, Zap, Brain, Sparkles } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { AuiIf, ComposerPrimitive } from '@assistant-ui/react'
+import { ArrowUp, BookMarked, ChevronDown, Zap, Brain, Sparkles, Square } from 'lucide-react'
 import type { ThinkingMode } from '../../api/chat'
 import { useLocale } from '../../i18n/locale'
 import LanguagePicker from './LanguagePicker'
@@ -11,27 +12,27 @@ const MODES: { value: ThinkingMode; icon: typeof Zap }[] = [
 ]
 
 interface ChatInputProps {
-  onSend: (message: string, includeCitations: boolean) => void
-  isLoading: boolean
   mode: ThinkingMode
   onModeChange: (mode: ThinkingMode) => void
+  includeCitations: boolean
+  onIncludeCitationsChange: (include: boolean) => void
   language: string
   onLanguageChange: (code: string) => void
 }
 
+const ROUND_BUTTON =
+  'w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer shrink-0 bg-primary hover:bg-primary-dark text-white shadow-sm'
+
 export default function ChatInput({
-  onSend,
-  isLoading,
   mode,
   onModeChange,
+  includeCitations,
+  onIncludeCitationsChange,
   language,
   onLanguageChange,
 }: ChatInputProps) {
   const { strings: t, languages } = useLocale()
-  const [message, setMessage] = useState('')
-  const [includeCitations, setIncludeCitations] = useState(true)
   const [modeDropdownOpen, setModeDropdownOpen] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -45,63 +46,27 @@ export default function ChatInput({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [modeDropdownOpen])
 
-  const handleSubmit = useCallback(
-    (e?: React.FormEvent) => {
-      e?.preventDefault()
-      const trimmed = message.trim()
-      if (!trimmed || isLoading) return
-      onSend(trimmed, includeCitations)
-      setMessage('')
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto'
-      }
-    },
-    [message, isLoading, onSend, includeCitations]
-  )
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        handleSubmit()
-      }
-    },
-    [handleSubmit]
-  )
-
-  const handleInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value)
-    const el = e.target
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 140) + 'px'
-  }, [])
-
   const currentMode = MODES.find(m => m.value === mode) || MODES[0]
   const CurrentIcon = currentMode.icon
-  const hasContent = message.trim().length > 0
 
   return (
     <div className="bg-chat-bg px-4 pb-4 pt-2 shrink-0">
       <div className="max-w-3xl mx-auto">
-        <form onSubmit={handleSubmit}>
+        <ComposerPrimitive.Root>
           <div className="relative bg-white rounded-2xl border border-border shadow-sm focus-within:border-primary/40 focus-within:shadow-md transition-all">
-            <textarea
-              ref={textareaRef}
-              value={message}
-              onChange={handleInput}
-              onKeyDown={handleKeyDown}
+            <ComposerPrimitive.Input
               placeholder={t.inputPlaceholder}
-              disabled={isLoading}
               rows={1}
+              submitMode="enter"
               aria-label={t.inputLabel}
-              className="w-full resize-none bg-transparent px-4 pt-3.5 pb-12 text-sm text-text-primary placeholder-text-muted outline-none disabled:opacity-50"
+              className="block w-full resize-none bg-transparent px-4 pt-3.5 pb-12 text-sm text-text-primary placeholder-text-muted outline-none max-h-[188px]"
             />
 
             <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setIncludeCitations(prev => !prev)}
+                  onClick={() => onIncludeCitationsChange(!includeCitations)}
                   aria-pressed={includeCitations}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                     includeCitations
@@ -164,25 +129,22 @@ export default function ChatInput({
                 )}
               </div>
 
-              <button
-                type="submit"
-                disabled={!hasContent || isLoading}
-                aria-label={t.send}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer shrink-0 ${
-                  hasContent && !isLoading
-                    ? 'bg-primary hover:bg-primary-dark text-white shadow-sm'
-                    : 'bg-black/[0.05] text-text-muted cursor-not-allowed'
-                }`}
-              >
-                {isLoading ? (
-                  <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
-                ) : (
+              <AuiIf condition={s => !s.thread.isRunning}>
+                <ComposerPrimitive.Send
+                  aria-label={t.send}
+                  className={`${ROUND_BUTTON} disabled:bg-black/[0.05] disabled:text-text-muted disabled:shadow-none disabled:cursor-not-allowed`}
+                >
                   <ArrowUp className="w-4 h-4" strokeWidth={2.5} />
-                )}
-              </button>
+                </ComposerPrimitive.Send>
+              </AuiIf>
+              <AuiIf condition={s => s.thread.isRunning}>
+                <ComposerPrimitive.Cancel aria-label={t.stop} title={t.stop} className={ROUND_BUTTON}>
+                  <Square className="w-3 h-3 fill-current" strokeWidth={2.5} />
+                </ComposerPrimitive.Cancel>
+              </AuiIf>
             </div>
           </div>
-        </form>
+        </ComposerPrimitive.Root>
       </div>
     </div>
   )

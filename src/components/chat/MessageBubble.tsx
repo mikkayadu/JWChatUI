@@ -1,319 +1,156 @@
-import { memo, useState, useCallback, useMemo, type ReactNode } from 'react'
-import { BookOpenCheck, ExternalLink } from 'lucide-react'
-import Markdown from 'react-markdown'
-import type { ChatMessage, SourceItem } from '../../types'
-import type { UiStrings } from '../../i18n/strings'
-import { bookNamesFor, useLocale } from '../../i18n/locale'
-import { SCRIPTURE_PATTERN, resolveScripture, type ScriptureRef } from '../../utils/scripture'
-import { classifySource } from '../../utils/jwUrl'
-import ScripturePopup from './ScripturePopup'
+import type { ReactNode } from 'react'
+import {
+  ActionBarPrimitive,
+  AuiIf,
+  ComposerPrimitive,
+  MessagePrimitive,
+  useAuiState,
+  type AssistantState,
+  type TextMessagePartComponent,
+} from '@assistant-ui/react'
+import { BookOpenCheck, Check, Copy, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
+import type { SourceItem } from '../../types'
+import { useLocale } from '../../i18n/locale'
+import AnswerContent from './AnswerContent'
 
-interface MessageBubbleProps {
-  message: ChatMessage
-}
+const NO_SOURCES: SourceItem[] = []
 
-interface ParsedSource {
-  index: number
-  indices: number[]
-  url: string
-  title: string
-  type: string
-}
+const ACTION_BUTTON =
+  'group p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-black/[0.04] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none data-[submitted=true]:text-primary'
 
-interface ParsedContent {
-  body: string
-  sources: ParsedSource[]
-  sourceMap: Map<number, string>
-}
-
-/** Display type and title for a source, in the UI language. */
-function describeSource(url: string, t: UiStrings): { type: string; title: string } {
-  const { kind, title } = classifySource(url)
-  const type = t.sourceTypes[kind]
-  return { type, title: title || (kind === 'teaching' ? t.bibleTeaching : type) }
-}
-
-// A "Sources:" section starting a line. Older backends' Advanced mode ends
-// answers with one, duplicating the list shown below the answer.
-const SOURCES_SECTION = /(?:^|\n)[ \t]*(?:#{1,6}[ \t]*)?(?:\*\*|__)?Sources?(?:\*\*|__)?:/i
-
-function parseResponseContent(text: string, backendSources: SourceItem[], t: UiStrings): ParsedContent {
-  const sectionStart = text.search(SOURCES_SECTION)
-  const body = (sectionStart === -1 ? text : text.slice(0, sectionStart)).trim()
-
-  const sourceMap = new Map<number, string>()
-  const deduped: ParsedSource[] = []
-  const urlToSource = new Map<string, ParsedSource>()
-
-  for (let i = 0; i < backendSources.length; i++) {
-    const index = i + 1
-    const url = backendSources[i].source
-    sourceMap.set(index, url)
-
-    const existing = urlToSource.get(url)
-    if (existing) {
-      existing.indices.push(index)
-    } else {
-      const { type, title } = describeSource(url, t)
-      const src: ParsedSource = { index, indices: [index], url, title, type }
-      urlToSource.set(url, src)
-      deduped.push(src)
-    }
-  }
-
-  return { body, sources: deduped, sourceMap }
-}
-
-const CITATION_PATTERN = String.raw`\[(\d+)\]`
-const INLINE_REGEX = new RegExp(`(${SCRIPTURE_PATTERN})|(${CITATION_PATTERN})`, 'gu')
-
-type ScriptureClickHandler = (ref: ScriptureRef, e: React.MouseEvent<HTMLButtonElement>) => void
-
-interface InlineContext {
-  sourceMap: Map<number, string>
-  /** Book names in the answer's language, for linking scripture references. */
-  bookNames: readonly string[]
-  t: UiStrings
-  onScriptureClick: ScriptureClickHandler
-}
-
-function processInlineText(text: string, ctx: InlineContext): ReactNode[] {
-  const { sourceMap, bookNames, t, onScriptureClick } = ctx
-  const result: ReactNode[] = []
-  let lastIndex = 0
-
-  for (const match of text.matchAll(INLINE_REGEX)) {
-    const start = match.index
-    if (start > lastIndex) {
-      result.push(text.slice(lastIndex, start))
-    }
-
-    if (match[0].startsWith('[')) {
-      const num = parseInt(match[0].slice(1, -1), 10)
-      const url = sourceMap.get(num)
-      if (url) {
-        result.push(
-          <a
-            key={`c-${start}`}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={t.sourceNumber(num)}
-            className="inline-flex items-center justify-center text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded px-1 py-px mx-px cursor-pointer no-underline transition-colors align-super leading-none"
-          >
-            {num}
-          </a>
-        )
-      } else {
-        result.push(
-          <span key={`c-${start}`} className="text-[10px] font-bold text-text-muted bg-gray-100 rounded px-1 py-px mx-px align-super leading-none">
-            {num}
-          </span>
-        )
-      }
-    } else {
-      const resolved = resolveScripture(match[0], bookNames)
-      if (!resolved) {
-        result.push(match[0])
-      } else {
-        if (resolved.prefix) result.push(resolved.prefix)
-        result.push(
-          <button
-            type="button"
-            key={`s-${start}`}
-            onClick={e => onScriptureClick(resolved.ref, e)}
-            className="text-primary font-semibold hover:underline cursor-pointer bg-transparent border-none p-0 text-sm inline font-[inherit]"
-          >
-            {resolved.ref.label}
-          </button>
-        )
-      }
-    }
-
-    lastIndex = start + match[0].length
-  }
-
-  if (lastIndex < text.length) {
-    result.push(text.slice(lastIndex))
-  }
-
-  return result
-}
-
-function processChildren(children: ReactNode, ctx: InlineContext): ReactNode {
-  if (typeof children === 'string') {
-    return processInlineText(children, ctx)
-  }
-  if (Array.isArray(children)) {
-    return children.map((child, i) => {
-      if (typeof child === 'string') {
-        return <span key={i}>{processInlineText(child, ctx)}</span>
-      }
-      return child
-    })
-  }
-  return children
-}
-
-function MessageBubble({ message }: MessageBubbleProps) {
-  const { strings: t, languages } = useLocale()
-  const [scripturePopup, setScripturePopup] = useState<{
-    scripture: ScriptureRef
-    rect: DOMRect
-  } | null>(null)
-
-  const handleScriptureClick = useCallback<ScriptureClickHandler>((scripture, e) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setScripturePopup({ scripture, rect })
-  }, [])
-
-  const { body, sources, sourceMap } = useMemo(
-    () => parseResponseContent(message.content, message.sources, t),
-    [message.content, message.sources, t]
-  )
-
-  if (message.role === 'user') {
-    return (
-      <div className="flex justify-end gap-3 px-6">
-        <div className="max-w-[75%] bg-user-bg rounded-2xl rounded-br-sm px-4 py-3 shadow-sm">
-          <p className="text-sm text-white leading-relaxed">{message.content}</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Answers from backends without languages carry no language: English.
-  const answerLanguage = message.language ?? 'en'
-  const caret = message.streaming ? (
-    <span
-      aria-hidden="true"
-      className="inline-block w-1.5 h-4 ml-0.5 align-text-bottom bg-primary/70 animate-pulse"
-    />
-  ) : null
-
-  const inlineContext: InlineContext = {
-    sourceMap,
-    bookNames: bookNamesFor(languages, answerLanguage),
-    t,
-    onScriptureClick: handleScriptureClick,
-  }
-  const process = (children: ReactNode) => processChildren(children, inlineContext)
-
+function AssistantAvatar() {
   return (
-    <div className="flex gap-3 px-6">
-      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
-        <BookOpenCheck className="w-4 h-4 text-white" strokeWidth={2} />
-      </div>
-      <div className="max-w-[80%] bg-white rounded-2xl rounded-bl-sm border border-border/60 px-5 py-4 shadow-sm">
-        <div className="prose-jwchat" lang={answerLanguage}>
-          <Markdown
-            components={{
-              p: ({ children: c }) => (
-                <p className="text-sm text-text-primary leading-relaxed mb-3 last:mb-0">
-                  {process(c)}
-                </p>
-              ),
-              strong: ({ children: c }) => (
-                <strong className="font-semibold text-text-primary">{process(c)}</strong>
-              ),
-              em: ({ children: c }) => (
-                <em className="italic">{process(c)}</em>
-              ),
-              h1: ({ children: c }) => (
-                <div className="border-l-3 border-accent-blue pl-3 mt-4 mb-2 first:mt-0">
-                  <h4 className="text-xs font-bold tracking-wider uppercase text-accent-blue">{process(c)}</h4>
-                </div>
-              ),
-              h2: ({ children: c }) => (
-                <div className="border-l-3 border-accent-blue pl-3 mt-4 mb-2 first:mt-0">
-                  <h4 className="text-xs font-bold tracking-wider uppercase text-accent-blue">{process(c)}</h4>
-                </div>
-              ),
-              h3: ({ children: c }) => (
-                <div className="border-l-3 border-accent-orange pl-3 mt-3 mb-2">
-                  <h4 className="text-xs font-bold tracking-wider uppercase text-accent-orange">{process(c)}</h4>
-                </div>
-              ),
-              ul: ({ children: c }) => (
-                <ul className="list-disc pl-5 mb-3 space-y-1.5">{c}</ul>
-              ),
-              ol: ({ children: c }) => (
-                <ol className="list-decimal pl-5 mb-3 space-y-1.5">{c}</ol>
-              ),
-              li: ({ children: c }) => (
-                <li className="text-sm text-text-primary leading-relaxed">{process(c)}</li>
-              ),
-              blockquote: ({ children: c }) => (
-                <blockquote className="border-l-3 border-primary/30 pl-3 my-3 italic text-text-secondary text-sm">
-                  {c}
-                </blockquote>
-              ),
-              a: ({ href, children: c }) => (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  {c}
-                </a>
-              ),
-            }}
-          >
-            {body}
-          </Markdown>
-          {caret}
-        </div>
-
-        {sources.length > 0 && !message.streaming && (
-          <div className="mt-4 pt-3 border-t border-border/60">
-            <h5 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2.5">
-              {t.sources}
-            </h5>
-            <ol className="space-y-2 list-none m-0 p-0">
-              {sources.map(src => (
-                <li key={src.index} className="group">
-                  <a
-                    href={src.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-start gap-2.5 rounded-lg px-2.5 py-2 -mx-2.5 hover:bg-gray-50 transition-colors no-underline"
-                  >
-                    <span className="text-[11px] font-bold text-primary bg-primary/10 rounded px-1.5 py-0.5 shrink-0 mt-0.5">
-                      {src.index}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-accent-orange">
-                          {src.type}
-                        </span>
-                      </div>
-                      <p className="text-xs font-semibold text-text-primary leading-snug m-0 flex items-center gap-1">
-                        <span className="line-clamp-1">{src.title}</span>
-                        <ExternalLink className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
-                      </p>
-                    </div>
-                  </a>
-                </li>
-              ))}
-            </ol>
-          </div>
-        )}
-      </div>
-
-      {scripturePopup && (
-        <ScripturePopup
-          key={scripturePopup.scripture.label}
-          scripture={scripturePopup.scripture}
-          lang={answerLanguage}
-          anchorRect={scripturePopup.rect}
-          onClose={() => setScripturePopup(null)}
-        />
-      )}
+    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
+      <BookOpenCheck className="w-4 h-4 text-white" strokeWidth={2} />
     </div>
   )
 }
 
-// Memoised: while one answer streams, every token re-renders the chat, and the
-// settled bubbles (same message objects) can skip re-parsing their content.
-export default memo(MessageBubble)
+function AssistantBubble({ children }: { children: ReactNode }) {
+  return (
+    <div className="max-w-full bg-white rounded-2xl rounded-bl-sm border border-border/60 px-5 py-4 shadow-sm">
+      {children}
+    </div>
+  )
+}
+
+/** The greeting shown at the top of every thread; not a runtime message. */
+export function WelcomeMessage() {
+  const { strings: t, uiLanguage } = useLocale()
+  return (
+    <div className="flex gap-3 px-6">
+      <AssistantAvatar />
+      <div className="max-w-[80%]">
+        <AssistantBubble>
+          <AnswerContent content={t.welcome} sources={NO_SOURCES} language={uiLanguage} />
+        </AssistantBubble>
+      </div>
+    </div>
+  )
+}
+
+/** The answer text part, rendered with our citation and scripture handling. */
+const AnswerText: TextMessagePartComponent = ({ text, status }) => {
+  const sources = useAuiState(s => s.message.metadata.custom?.sources as SourceItem[] | undefined)
+  const language = useAuiState(s => s.message.metadata.custom?.language as string | undefined)
+  return (
+    <AnswerContent
+      content={text}
+      sources={sources ?? NO_SOURCES}
+      language={language}
+      streaming={status.type === 'running'}
+    />
+  )
+}
+
+/** Running with no text yet: the backend is still retrieving and thinking. */
+const isThinking = (s: AssistantState) =>
+  s.message.status?.type === 'running' && !s.message.content.some(part => part.type === 'text' && part.text)
+
+export function AssistantMessage() {
+  const { strings: t } = useLocale()
+  return (
+    <MessagePrimitive.Root className="flex gap-3 px-6">
+      <AssistantAvatar />
+      <div className="max-w-[80%] min-w-0 flex flex-col items-start">
+        <AuiIf condition={isThinking}>
+          <div className="bg-white rounded-2xl rounded-bl-md border border-border px-5 py-4 shadow-sm" role="status" aria-label={t.thinking}>
+            <div className="flex gap-1.5" aria-hidden="true">
+              <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+            <span className="sr-only">{t.generating}</span>
+          </div>
+        </AuiIf>
+        <AuiIf condition={s => !isThinking(s)}>
+          <AssistantBubble>
+            <MessagePrimitive.Parts components={{ Text: AnswerText }} />
+          </AssistantBubble>
+        </AuiIf>
+
+        <div className="min-h-8 mt-1">
+          <ActionBarPrimitive.Root hideWhenRunning autohide="not-last" className="flex items-center gap-0.5 -ml-1">
+            <ActionBarPrimitive.Copy className={ACTION_BUTTON} aria-label={t.copy} title={t.copy}>
+              <Copy className="w-4 h-4 group-data-[copied=true]:hidden" strokeWidth={1.8} />
+              <Check className="w-4 h-4 hidden group-data-[copied=true]:block" strokeWidth={2} />
+            </ActionBarPrimitive.Copy>
+            <ActionBarPrimitive.Reload className={ACTION_BUTTON} aria-label={t.regenerate} title={t.regenerate}>
+              <RefreshCw className="w-4 h-4" strokeWidth={1.8} />
+            </ActionBarPrimitive.Reload>
+            <ActionBarPrimitive.FeedbackPositive className={ACTION_BUTTON} aria-label={t.helpful} title={t.helpful}>
+              <ThumbsUp className="w-4 h-4 group-data-[submitted=true]:fill-primary/20" strokeWidth={1.8} />
+            </ActionBarPrimitive.FeedbackPositive>
+            <ActionBarPrimitive.FeedbackNegative className={ACTION_BUTTON} aria-label={t.notHelpful} title={t.notHelpful}>
+              <ThumbsDown className="w-4 h-4 group-data-[submitted=true]:fill-primary/20" strokeWidth={1.8} />
+            </ActionBarPrimitive.FeedbackNegative>
+          </ActionBarPrimitive.Root>
+        </div>
+      </div>
+    </MessagePrimitive.Root>
+  )
+}
+
+const QuestionText: TextMessagePartComponent = ({ text }) => (
+  <p className="text-sm text-white leading-relaxed whitespace-pre-wrap break-words">{text}</p>
+)
+
+export function UserMessage() {
+  const { strings: t } = useLocale()
+  return (
+    <MessagePrimitive.Root className="flex justify-end items-start gap-1.5 px-6">
+      <ActionBarPrimitive.Root hideWhenRunning autohide="always" className="mt-2">
+        <ActionBarPrimitive.Edit className={ACTION_BUTTON} aria-label={t.edit} title={t.edit}>
+          <Pencil className="w-3.5 h-3.5" strokeWidth={1.8} />
+        </ActionBarPrimitive.Edit>
+      </ActionBarPrimitive.Root>
+      <div className="max-w-[75%] bg-user-bg rounded-2xl rounded-br-sm px-4 py-3 shadow-sm">
+        <MessagePrimitive.Parts components={{ Text: QuestionText }} />
+      </div>
+    </MessagePrimitive.Root>
+  )
+}
+
+/** Replaces a user message while it is being edited. */
+export function EditComposer() {
+  const { strings: t } = useLocale()
+  return (
+    <MessagePrimitive.Root className="flex justify-end px-6">
+      <ComposerPrimitive.Root className="w-full max-w-[75%] bg-white rounded-2xl border border-primary/40 shadow-md">
+        <ComposerPrimitive.Input
+          autoFocus
+          aria-label={t.edit}
+          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-sm text-text-primary outline-none max-h-[188px]"
+        />
+        <div className="flex justify-end gap-1.5 px-2 pb-2">
+          <ComposerPrimitive.Cancel className="px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:bg-black/[0.04] transition-colors cursor-pointer">
+            {t.cancel}
+          </ComposerPrimitive.Cancel>
+          <ComposerPrimitive.Send className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm transition-colors cursor-pointer disabled:bg-black/[0.05] disabled:text-text-muted disabled:shadow-none disabled:cursor-not-allowed">
+            {t.update}
+          </ComposerPrimitive.Send>
+        </div>
+      </ComposerPrimitive.Root>
+    </MessagePrimitive.Root>
+  )
+}
