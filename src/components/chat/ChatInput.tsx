@@ -50,7 +50,7 @@ export default function ChatInput({
   const CurrentIcon = currentMode.icon
 
   return (
-    <div className="bg-chat-bg px-4 pb-4 pt-2 shrink-0">
+    <div className="bg-chat-bg px-3 sm:px-4 pb-3 sm:pb-4 pt-2 shrink-0">
       <div className="max-w-3xl mx-auto">
         <ComposerPrimitive.Root>
           <div className="relative bg-white rounded-2xl border border-border shadow-sm focus-within:border-primary/40 focus-within:shadow-md transition-all">
@@ -59,30 +59,31 @@ export default function ChatInput({
               rows={1}
               submitMode="enter"
               aria-label={t.inputLabel}
-              className="block w-full resize-none bg-transparent px-4 pt-3.5 pb-12 text-sm text-text-primary placeholder-text-muted outline-none max-h-[188px]"
+              className="block w-full resize-none bg-transparent px-4 pt-3.5 pb-12 text-sm pointer-coarse:text-base text-text-primary placeholder-text-muted outline-none max-h-[188px]"
             />
 
             <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                 <button
                   type="button"
                   onClick={() => onIncludeCitationsChange(!includeCitations)}
                   aria-pressed={includeCitations}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  title={t.citations}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 pointer-coarse:py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                     includeCitations
                       ? 'bg-primary/10 text-primary'
                       : 'hover:bg-black/[0.04] text-text-muted'
                   }`}
                 >
                   <BookMarked className="w-3.5 h-3.5" strokeWidth={1.8} />
-                  {t.citations}
+                  <span className="max-sm:sr-only">{t.citations}</span>
                 </button>
 
                 <div className="relative" ref={dropdownRef}>
                   <button
                     type="button"
                     onClick={() => setModeDropdownOpen(prev => !prev)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 pointer-coarse:py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                       mode !== 'normal'
                         ? 'bg-accent-gold/10 text-accent-gold'
                         : 'hover:bg-black/[0.04] text-text-muted'

@@ -20,7 +20,7 @@ const MESSAGE_COMPONENTS = { UserMessage, AssistantMessage, EditComposer }
 function Suggestions() {
   const { strings: t } = useLocale()
   return (
-    <div className="grid gap-2 sm:grid-cols-2 px-6 sm:pl-[68px] animate-fade-in-up">
+    <div className="grid gap-2 sm:grid-cols-2 px-3 sm:px-6 sm:pl-[68px] animate-fade-in-up">
       {t.suggestions.map(prompt => (
         <ThreadPrimitive.Suggestion
           key={prompt}

@@ -73,7 +73,12 @@ export default function ScripturePopup({ scripture, lang, onClose, anchorRect }:
       ? `${verseState.result.url}#${verseAnchor(scripture)}`
       : studyBibleUrl(scripture)
 
-  const style: React.CSSProperties = anchorRect
+  // Phones (and short landscape screens) get a bottom sheet: an anchored
+  // popover can't fit beside the reference there.
+  const isSheet = window.innerWidth < 640 || window.innerHeight < 500
+  const style: React.CSSProperties | undefined = isSheet
+    ? undefined
+    : anchorRect
     ? {
         position: 'fixed',
         top: Math.min(anchorRect.bottom + 8, window.innerHeight - 200),
@@ -97,7 +102,11 @@ export default function ScripturePopup({ scripture, lang, onClose, anchorRect }:
         lang={lang}
         tabIndex={-1}
         style={style}
-        className="z-50 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-fade-in-up"
+        className={`z-50 bg-white shadow-2xl border border-gray-200 overflow-hidden animate-fade-in-up ${
+          isSheet
+            ? 'fixed inset-x-0 bottom-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)]'
+            : 'w-80 rounded-xl'
+        }`}
       >
         <div className="flex items-center justify-between px-4 py-3 bg-primary/5 border-b border-gray-100">
           <h3 className="text-sm font-semibold text-primary">{scripture.label}</h3>
@@ -105,7 +114,7 @@ export default function ScripturePopup({ scripture, lang, onClose, anchorRect }:
             type="button"
             onClick={onClose}
             aria-label={t.closeScripture}
-            className="p-1 rounded-md hover:bg-gray-200 transition-colors cursor-pointer"
+            className="p-1 pointer-coarse:p-2 rounded-md hover:bg-gray-200 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4 text-gray-500" />
           </button>
@@ -121,7 +130,7 @@ export default function ScripturePopup({ scripture, lang, onClose, anchorRect }:
               {t.verseError}
             </p>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-2 max-h-[min(16rem,45dvh)] overflow-y-auto">
               {verseState.result.verses.map(v => (
                 <p key={v.verse} className="text-sm text-text-primary leading-relaxed">
                   <sup className="text-[10px] font-bold text-primary mr-1">{v.verse}</sup>
@@ -135,7 +144,7 @@ export default function ScripturePopup({ scripture, lang, onClose, anchorRect }:
             href={jwOrgUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-primary no-underline hover:underline"
+            className="mt-3 pointer-coarse:py-2 flex items-center justify-center gap-1.5 text-xs font-semibold text-primary no-underline hover:underline"
           >
             {t.openOnJwOrg}
             <ExternalLink className="w-3.5 h-3.5" />

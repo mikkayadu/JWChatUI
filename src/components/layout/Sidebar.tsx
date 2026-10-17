@@ -25,7 +25,7 @@ function ThreadItem({ onSelect }: { onSelect: () => void }) {
     <ThreadListItemPrimitive.Root className="group relative flex items-center rounded-xl text-white/60 hover:bg-white/[0.08] hover:text-white/90 data-[active=true]:bg-sidebar-active data-[active=true]:text-white transition-all">
       <ThreadListItemPrimitive.Trigger
         onClick={onSelect}
-        className="flex-1 min-w-0 flex items-center gap-3 pl-4 pr-9 py-2 text-left text-[13px] cursor-pointer"
+        className="flex-1 min-w-0 flex items-center gap-3 pl-4 pr-9 py-2 pointer-coarse:py-2.5 text-left text-[13px] cursor-pointer"
       >
         <MessageSquare className="w-4 h-4 shrink-0 opacity-70" strokeWidth={1.8} />
         <span className="truncate">
@@ -35,7 +35,7 @@ function ThreadItem({ onSelect }: { onSelect: () => void }) {
       <ThreadListItemPrimitive.Delete
         aria-label={t.deleteChat}
         title={t.deleteChat}
-        className="absolute right-1.5 p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer"
+        className="absolute right-1.5 p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100 transition-opacity cursor-pointer"
       >
         <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} />
       </ThreadListItemPrimitive.Delete>

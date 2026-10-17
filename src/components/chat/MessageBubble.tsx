@@ -11,16 +11,17 @@ import {
 import { BookOpenCheck, Check, Copy, Pencil, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import type { SourceItem } from '../../types'
 import { useLocale } from '../../i18n/locale'
+import { useCanHover } from '../../hooks/useCanHover'
 import AnswerContent from './AnswerContent'
 
 const NO_SOURCES: SourceItem[] = []
 
 const ACTION_BUTTON =
-  'group p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-black/[0.04] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none data-[submitted=true]:text-primary'
+  'group p-1.5 pointer-coarse:p-2 rounded-lg text-text-muted hover:text-primary hover:bg-black/[0.04] transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none data-[submitted=true]:text-primary'
 
 function AssistantAvatar() {
   return (
-    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
+    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1">
       <BookOpenCheck className="w-4 h-4 text-white" strokeWidth={2} />
     </div>
   )
@@ -28,7 +29,7 @@ function AssistantAvatar() {
 
 function AssistantBubble({ children }: { children: ReactNode }) {
   return (
-    <div className="max-w-full bg-white rounded-2xl rounded-bl-sm border border-border/60 px-5 py-4 shadow-sm">
+    <div className="max-w-full bg-white rounded-2xl rounded-bl-sm border border-border/60 px-4 py-3 sm:px-5 sm:py-4 shadow-sm">
       {children}
     </div>
   )
@@ -38,9 +39,9 @@ function AssistantBubble({ children }: { children: ReactNode }) {
 export function WelcomeMessage() {
   const { strings: t, uiLanguage } = useLocale()
   return (
-    <div className="flex gap-3 px-6">
+    <div className="flex gap-2 sm:gap-3 px-3 sm:px-6">
       <AssistantAvatar />
-      <div className="max-w-[80%]">
+      <div className="min-w-0 max-w-[calc(100%-2.25rem)] sm:max-w-[80%]">
         <AssistantBubble>
           <AnswerContent content={t.welcome} sources={NO_SOURCES} language={uiLanguage} />
         </AssistantBubble>
@@ -69,12 +70,13 @@ const isThinking = (s: AssistantState) =>
 
 export function AssistantMessage() {
   const { strings: t } = useLocale()
+  const canHover = useCanHover()
   return (
-    <MessagePrimitive.Root className="flex gap-3 px-6">
+    <MessagePrimitive.Root className="flex gap-2 sm:gap-3 px-3 sm:px-6">
       <AssistantAvatar />
-      <div className="max-w-[80%] min-w-0 flex flex-col items-start">
+      <div className="min-w-0 max-w-[calc(100%-2.25rem)] sm:max-w-[80%] flex flex-col items-start">
         <AuiIf condition={isThinking}>
-          <div className="bg-white rounded-2xl rounded-bl-md border border-border px-5 py-4 shadow-sm" role="status" aria-label={t.thinking}>
+          <div className="bg-white rounded-2xl rounded-bl-md border border-border px-4 py-3 sm:px-5 sm:py-4 shadow-sm" role="status" aria-label={t.thinking}>
             <div className="flex gap-1.5" aria-hidden="true">
               <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '0ms' }} />
               <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -90,7 +92,7 @@ export function AssistantMessage() {
         </AuiIf>
 
         <div className="min-h-8 mt-1">
-          <ActionBarPrimitive.Root hideWhenRunning autohide="not-last" className="flex items-center gap-0.5 -ml-1">
+          <ActionBarPrimitive.Root hideWhenRunning autohide={canHover ? 'not-last' : 'never'} className="flex items-center gap-0.5 -ml-1">
             <ActionBarPrimitive.Copy className={ACTION_BUTTON} aria-label={t.copy} title={t.copy}>
               <Copy className="w-4 h-4 group-data-[copied=true]:hidden" strokeWidth={1.8} />
               <Check className="w-4 h-4 hidden group-data-[copied=true]:block" strokeWidth={2} />
@@ -117,14 +119,15 @@ const QuestionText: TextMessagePartComponent = ({ text }) => (
 
 export function UserMessage() {
   const { strings: t } = useLocale()
+  const canHover = useCanHover()
   return (
-    <MessagePrimitive.Root className="flex justify-end items-start gap-1.5 px-6">
-      <ActionBarPrimitive.Root hideWhenRunning autohide="always" className="mt-2">
+    <MessagePrimitive.Root className="flex justify-end items-start gap-1 sm:gap-1.5 px-3 sm:px-6">
+      <ActionBarPrimitive.Root hideWhenRunning autohide={canHover ? 'always' : 'never'} className="mt-1.5 shrink-0">
         <ActionBarPrimitive.Edit className={ACTION_BUTTON} aria-label={t.edit} title={t.edit}>
           <Pencil className="w-3.5 h-3.5" strokeWidth={1.8} />
         </ActionBarPrimitive.Edit>
       </ActionBarPrimitive.Root>
-      <div className="max-w-[75%] bg-user-bg rounded-2xl rounded-br-sm px-4 py-3 shadow-sm">
+      <div className="min-w-0 max-w-[85%] sm:max-w-[75%] bg-user-bg rounded-2xl rounded-br-sm px-4 py-3 shadow-sm">
         <MessagePrimitive.Parts components={{ Text: QuestionText }} />
       </div>
     </MessagePrimitive.Root>
@@ -135,18 +138,18 @@ export function UserMessage() {
 export function EditComposer() {
   const { strings: t } = useLocale()
   return (
-    <MessagePrimitive.Root className="flex justify-end px-6">
-      <ComposerPrimitive.Root className="w-full max-w-[75%] bg-white rounded-2xl border border-primary/40 shadow-md">
+    <MessagePrimitive.Root className="flex justify-end px-3 sm:px-6">
+      <ComposerPrimitive.Root className="w-full sm:max-w-[75%] bg-white rounded-2xl border border-primary/40 shadow-md">
         <ComposerPrimitive.Input
           autoFocus
           aria-label={t.edit}
-          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-sm text-text-primary outline-none max-h-[188px]"
+          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-sm pointer-coarse:text-base text-text-primary outline-none max-h-[188px]"
         />
         <div className="flex justify-end gap-1.5 px-2 pb-2">
-          <ComposerPrimitive.Cancel className="px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:bg-black/[0.04] transition-colors cursor-pointer">
+          <ComposerPrimitive.Cancel className="px-3 py-1.5 pointer-coarse:py-2 rounded-lg text-xs font-medium text-text-secondary hover:bg-black/[0.04] transition-colors cursor-pointer">
             {t.cancel}
           </ComposerPrimitive.Cancel>
-          <ComposerPrimitive.Send className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm transition-colors cursor-pointer disabled:bg-black/[0.05] disabled:text-text-muted disabled:shadow-none disabled:cursor-not-allowed">
+          <ComposerPrimitive.Send className="px-3 py-1.5 pointer-coarse:py-2 rounded-lg text-xs font-semibold bg-primary hover:bg-primary-dark text-white shadow-sm transition-colors cursor-pointer disabled:bg-black/[0.05] disabled:text-text-muted disabled:shadow-none disabled:cursor-not-allowed">
             {t.update}
           </ComposerPrimitive.Send>
         </div>

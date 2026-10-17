@@ -103,7 +103,7 @@ function processInlineText(text: string, ctx: InlineContext): ReactNode[] {
             target="_blank"
             rel="noopener noreferrer"
             title={t.sourceNumber(num)}
-            className="inline-flex items-center justify-center text-[10px] font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded px-1 py-px mx-px cursor-pointer no-underline transition-colors align-super leading-none"
+            className="inline-flex items-center justify-center text-[10px] pointer-coarse:text-[11px] font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded px-1 py-px pointer-coarse:px-1.5 pointer-coarse:py-0.5 mx-px cursor-pointer no-underline transition-colors align-super leading-none"
           >
             {num}
           </a>
@@ -196,7 +196,7 @@ function AnswerContent({ content, sources: backendSources, language, streaming }
 
   return (
     <>
-      <div className="prose-jwchat" lang={answerLanguage}>
+      <div className="prose-jwchat [overflow-wrap:anywhere]" lang={answerLanguage}>
         <Markdown
           components={{
             p: ({ children: c }) => (

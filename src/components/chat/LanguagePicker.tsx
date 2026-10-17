@@ -40,7 +40,7 @@ export default function LanguagePicker({ value, onChange }: LanguagePickerProps)
         aria-label={`${t.answerLanguage}: ${current.label}`}
         aria-expanded={open}
         title={t.answerLanguage}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 pointer-coarse:py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
           !isAuto
             ? 'bg-primary/10 text-primary'
             : 'hover:bg-black/[0.04] text-text-muted'
